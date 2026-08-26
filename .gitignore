@@ -1,0 +1,8 @@
+data.json
+data.json.tmp
+tunnel.log
+login.log
+cloudflared.exe
+node_modules/
+*.tmp
+.DS_Store

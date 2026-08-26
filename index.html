@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>羽球双打轮转 · 对阵 / 计分 / 排名</title>
+<style>
+  :root{
+    --bg:#f1faf3; --panel:#ffffff; --primary:#2e9e5b; --primary-dark:#1f7a43;
+    --accent:#7bc96f; --text:#1f2d24; --muted:#6b7d72; --line:#dcefe2;
+    --win:#e8f7ec; --lose:#fdecea; --draw:#fff6e0; --pending:#eef2f0;
+    --tier-s:#2e9e5b; --tier-a:#4a90e2; --tier-b:#f5a623;
+    --shadow:0 1px 3px rgba(31,122,67,.08),0 6px 18px rgba(31,122,67,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.5;font-size:14px;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+  header.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--accent));
+    display:grid;place-items:center;color:#fff;font-size:22px;box-shadow:var(--shadow);flex:0 0 auto}
+  header.top h1{font-size:20px;margin:0;font-weight:700}
+  header.top p{margin:0;color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card h2 .tag{font-size:11px;color:var(--primary);background:var(--win);padding:2px 8px;border-radius:20px;font-weight:600}
+  label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
+  input[type=text],input[type=number],input[type=email],select{width:100%;padding:9px 10px;border:1px solid var(--line);
+    border-radius:9px;font-size:14px;background:#fbfdfc;color:var(--text)}
+  input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(46,158,91,.12)}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .chip{cursor:pointer;border:1px solid var(--line);background:#fbfdfc;border-radius:20px;padding:4px 12px;font-size:12px;color:var(--muted)}
+  .chip:hover{border-color:var(--primary);color:var(--primary)}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:9px;font-size:14px;font-weight:600;padding:9px 14px;transition:.15s;-webkit-tap-highlight-color:transparent}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-primary:hover{background:var(--primary-dark)}
+  .btn-ghost{background:#eef6f0;color:var(--primary-dark)}
+  .btn-ghost:hover{background:#e0efe6}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn-danger{background:#fdecea;color:#c0392b}
+  .btn-danger:hover{background:#f9d7d3}
+  .hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+  .sug{color:var(--primary);font-weight:600}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+  /* 选手列表（可编辑） */
+  .ptable{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+  .ptable th,.ptable td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .ptable th{color:var(--muted);font-weight:600;font-size:12px;text-align:left}
+  .ptable td input{border:none;background:transparent;padding:6px 4px;border-radius:6px;width:100%;font-size:13px;color:var(--text)}
+  .ptable td input:hover{background:#f1faf3}
+  .ptable td input:focus{background:#fff;box-shadow:inset 0 0 0 1px var(--primary)}
+  .ptable td .x{cursor:pointer;width:20px;height:20px;border-radius:50%;background:#e6efe9;color:var(--muted);
+    display:grid;place-items:center;font-size:13px}
+  .ptable td .x:hover{background:#f9d7d3;color:#c0392b}
+  .ptable td .g{font-size:11px;background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-style:normal}
+
+  h3.round{font-size:13px;color:var(--primary-dark);margin:16px 0 8px;padding-left:8px;border-left:3px solid var(--accent)}
+  .matches{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .match{background:#fbfdfc;border:1px solid var(--line);border-radius:11px;padding:11px;position:relative}
+  .del{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:#eef2f0;color:var(--muted);
+    border:none;font-size:13px;line-height:1;padding:0}
+  .del:hover{background:#f9d7d3;color:#c0392b}
+  .teams{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px;padding-right:22px}
+  .team{flex:1;text-align:center;padding:5px;border-radius:8px}
+  .team.win{background:var(--win);font-weight:700}
+  .team.lose{background:var(--lose);color:#b9443a}
+  .vs{color:var(--muted);font-size:11px;font-weight:700}
+  .score{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:9px}
+  .score input{width:74px;text-align:center;padding:7px;font-size:18px;font-weight:700;color:var(--text);
+    background:#fff;border:1.5px solid #b6d7c1;border-radius:9px}
+  .score input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(46,158,91,.15)}
+  .score input::placeholder{color:#c8ddd0;font-weight:400}
+  .colon{color:var(--muted);font-weight:700;font-size:18px}
+  .badge{font-size:11px;padding:2px 8px;border-radius:20px;margin-left:4px;font-weight:600}
+  .badge.win{background:var(--win);color:var(--primary-dark)}
+  .badge.lose{background:var(--lose);color:#b9443a}
+  .badge.draw{background:var(--draw);color:#9a7b1a}
+  .badge.pending{background:var(--pending);color:var(--muted)}
+  table.rktable{width:100%;border-collapse:collapse;font-size:13px}
+  .rktable th,.rktable td{padding:8px 5px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+  .rktable th{color:var(--muted);font-weight:600;font-size:12px;background:#f7fbf8}
+  .rktable td.name{text-align:left;white-space:normal}
+  .rktable tr:hover td{background:#f7fbf8}
+  .rank{font-weight:700;color:var(--primary-dark)}
+  .tier{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:800;font-size:13px}
+  .tier-S{background:var(--tier-s)}
+  .tier-A{background:var(--tier-a)}
+  .tier-B{background:var(--tier-b)}
+  .tier-未{background:#c4c4c4}
+  /* 蝴蝶图：左胜场 / 中选手+胜率 / 右负场 */
+  .butterfly{margin-top:4px}
+  .bf-head{display:grid;grid-template-columns:1fr 132px 1fr;font-size:12px;color:var(--muted);font-weight:700;padding:0 4px 6px;text-align:center}
+  .bf-row{display:grid;grid-template-columns:1fr 132px 1fr;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--line)}
+  .bf-side{display:flex;align-items:center;gap:4px;min-width:0}
+  .bf-left{justify-content:flex-end}
+  .bf-right{justify-content:flex-start}
+  .bf-val{font-weight:800;font-size:14px;color:var(--text);flex:0 0 20px;text-align:center}
+  .bf-track{flex:1 1 auto;height:18px;display:flex;align-items:center;min-width:0}
+  .bf-left .bf-track{justify-content:flex-end}
+  .bf-right .bf-track{justify-content:flex-start}
+  .bf-bar{height:100%;border-radius:5px;min-width:2px}
+  .bf-win{background:linear-gradient(to right,#bfe6cd,var(--primary))}
+  .bf-lose{background:linear-gradient(to right,var(--lose),#f0b9b3)}
+  .bf-center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-width:0}
+  .bf-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:132px}
+  .bf-rate{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:4px}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .tab{background:#eef6f0;color:var(--muted);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent}
+  .tab.active{background:var(--primary);color:#fff}
+  .cov{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+  .cov .item{background:#f7fbf8;border:1px solid var(--line);border-radius:10px;padding:8px 14px;flex:1;min-width:120px}
+  .cov .item b{display:block;font-size:20px;color:var(--primary-dark)}
+  .cov .item span{font-size:12px;color:var(--muted)}
+  #rankPlayers,#rankTeams,#rankDetail{overflow-x:auto}
+  .detail{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .dcard{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fbfdfc;min-width:0}
+  .dhead{font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .drow{display:flex;gap:6px;align-items:flex-start;margin:5px 0;flex-wrap:wrap}
+  .dlabel{flex:0 0 34px;color:var(--muted);font-size:12px;padding-top:3px}
+  .dchip{background:#eef6f0;border-radius:14px;padding:2px 9px;font-size:12px;color:var(--primary-dark);white-space:nowrap}
+  .dchip b{color:var(--muted);font-weight:600;margin-left:2px}
+  details{margin-top:14px;font-size:13px;color:var(--muted)}
+  details summary{cursor:pointer;color:var(--primary-dark);font-weight:600}
+  details ul{margin:8px 0 0;padding-left:18px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;
+    padding:10px 18px;border-radius:24px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:99;max-width:90vw}
+  .toast.show{opacity:.95}
+  footer{margin-top:24px;text-align:center;color:var(--muted);font-size:12px}
+  .empty{color:var(--muted);font-size:13px;padding:14px;text-align:center;background:#f7fbf8;border-radius:10px}
+  .mode{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;display:inline-block}
+  .mode.shared{background:var(--win);color:var(--primary-dark)}
+  .mode.local{background:#eef2f0;color:var(--muted)}
+  @media(max-width:560px){
+    .wrap{padding:12px 10px 56px}
+    .grid{gap:12px}
+    .card{padding:13px;border-radius:12px}
+    .card h2{font-size:14px}
+    .matches{grid-template-columns:1fr}
+    input,select,button{font-size:16px}
+    .score input{width:88px;padding:9px;font-size:20px}
+    .colon{font-size:20px}
+    .teams{font-size:14px}
+    .rktable{font-size:12px}
+    .ptable{font-size:14px}
+    .detail{grid-template-columns:1fr}
+    header.top h1{font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">🏸</div>
+    <div>
+      <h1>羽球双打轮转</h1>
+      <p>自由录入选手 · 全员搭档 · 对手均衡 · 计分排名</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- 左栏 -->
+    <div>
+      <div class="card">
+        <h2>① 选手录入 <span class="tag">列表可编辑</span></h2>
+        <label>姓名 / 昵称</label>
+        <input type="text" id="pname" placeholder="如：阿强、Lily" onkeydown="if(event.key==='Enter')addPlayer()">
+        <label>性别（自由填，自动归为 男 / 女）</label>
+        <input type="text" id="pgender" placeholder="男 / 女 / M / F …" onkeydown="if(event.key==='Enter')addPlayer()">
+        <div class="chips">
+          <span class="chip" onclick="setGender('男')">男</span>
+          <span class="chip" onclick="setGender('女')">女</span>
+          <span class="chip" onclick="setGender('')">清空</span>
+        </div>
+        <div class="actions">
+          <button class="btn-primary" onclick="addPlayer()">+ 添加选手</button>
+          <button class="btn-ghost btn-sm" onclick="loadDefaults()">载入默认名单</button>
+        </div>
+        <div id="playersList"></div>
+        <p class="hint" id="pcount"></p>
+      </div>
+
+      <div class="card">
+        <h2>② 同队限制 <span class="tag">不能搭档</span></h2>
+        <div class="row">
+          <select id="restA"></select>
+          <select id="restB"></select>
+          <button class="btn-ghost btn-sm" onclick="addRestriction()" style="flex:0 0 auto">+ 禁止同队</button>
+        </div>
+        <div class="players" id="restList" style="margin-top:10px"></div>
+        <p class="hint">添加后，生成对阵时这些组合绝不会出现在同一队。</p>
+      </div>
+
+      <div class="card">
+        <h2>③ 对阵设置</h2>
+        <div class="settings-row">
+          <div style="flex:1">
+            <label>比赛场数</label>
+            <input type="number" id="numMatches" min="1" placeholder="建议值">
+          </div>
+          <div style="flex:1">
+            <label>搭档偏好</label>
+            <select id="pmode">
+              <option value="none">无限制</option>
+              <option value="mixed">优先混双</option>
+              <option value="female">优先女双</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" id="suggestion"></p>
+        <div class="actions">
+          <button class="btn-primary" onclick="generateSchedule()">⚙ 生成对阵</button>
+          <button class="btn-ghost" onclick="generateSchedule()">↻ 重新生成</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏 -->
+    <div>
+      <div class="card">
+        <h2>④ 对阵表 <span class="tag">按轮分组</span></h2>
+        <div id="schedule"></div>
+        <div class="actions" id="scoreActions" style="display:none">
+          <button class="btn-ghost btn-sm" onclick="clearScores()">清空比分</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>⑤ 统计与排名</h2>
+        <div class="cov" id="coverage"></div>
+        <div class="tabs" style="margin-top:14px">
+          <div class="tab active" onclick="switchTab('players',this)">个人排名</div>
+          <div class="tab" onclick="switchTab('teams',this)">组合排名</div>
+          <div class="tab" onclick="switchTab('detail',this)">每人明细</div>
+        </div>
+        <div id="rankPlayers"></div>
+        <div id="rankTeams" style="display:none"></div>
+        <div id="rankDetail" style="display:none"></div>
+        <details>
+          <summary>排名规则 & 算法说明</summary>
+          <ul>
+            <li><b>个人排名（蝴蝶图）</b>：依<b>胜率</b>由高到低排序；胜率相同比胜场数、再比净胜分。左条=胜场，右条=负场，中为选手+胜率+等级。</li>
+            <li><b>等级评估</b>：按胜率分 S/A/B 三级——S≥75%、A≥50%、B&lt;50%；未赛为 –。</li>
+            <li><b>组合排名</b>：以「两人搭档」为单位累计胜场 / 净胜分。</li>
+            <li><b>每人明细</b>：列出该选手的每位搭档与每位对手及交手次数。</li>
+            <li><b>性别归一</b>：男/M/male… 归为「男」，女/F/female… 归为「女」，用于偏好与显示。</li>
+            <li><b>搭档覆盖</b>：贪心调度，尽量让每两人都搭档一次（人数 ≡ 0 或 1 (mod 4) 时可完全覆盖）。</li>
+            <li><b>对手均衡</b>：挑选 4 人时惩罚重复对阵；同队限制会被强制避开。</li>
+            <li>数据自动存档：共享模式存于后端、多人实时同步；本机模式存于浏览器（localStorage）。</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span id="footerBtns">
+      <button class="btn-ghost btn-sm" onclick="exportJSON()">导出备份</button>
+      <button class="btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">导入备份</button>
+      <button class="btn-danger btn-sm" onclick="resetAll()">清空全部</button>
+    </span>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importJSON(this)">
+    <div id="modeBadge" class="mode" style="margin-top:8px"></div>
+    <div style="margin-top:4px;font-size:11px">数据自动存档 · 共享模式多人同时填写同一份</div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORE='bd_v1';
+const DEFAULT_PLAYERS=[
+  {name:'往往',gender:'M'},{name:'kenny',gender:'M'},{name:'Kabonka',gender:'F'},
+  {name:'jaden很淡',gender:'M'},{name:'慧如OA',gender:'F'},{name:'Jimmy',gender:'M'},
+  {name:'果果',gender:'M'},{name:'Semon',gender:'M'},{name:'CarL',gender:'M'},
+  {name:'颖颖',gender:'F'},{name:'小可',gender:'F'},{name:'郭荣裕',gender:'M'},{name:'吴明谕',gender:'M'}
+];
+const state={players:[],matches:[],restrictions:[],settings:{numMatches:null,pmode:'none'},_curTab:'players'};
+
+/* ---------- 工具 ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function gkey(i,j){return i<j?i+'-'+j:j+'-'+i;}
+function normGender(g){
+  if(!g)return '';
+  const s=String(g).trim().toLowerCase();
+  if(/女|f|female|girl|0|姐|妹|娘|小姐|婆|母|woman|lady/.test(s))return '女';
+  if(/男|m|male|boy|1|哥|弟|爷|汉|先生|公|man|mr/.test(s))return '男';
+  return String(g).trim();
+}
+function ply(i){const p=state.players[i];const g=normGender(p.gender);return esc(p.name)+(g?` <i class="g">${esc(g)}</i>`:(p.gender?` <i class="g">${esc(p.gender)}</i>`:''));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800);}
+/* ---------- 存储：优先共享后端，回退本机 ---------- */
+const API_BASE=(window.BD_API_BASE||'');          // 可改成后端地址，如 'https://xxx.com'
+let MODE='local';                                 // 'shared'（多人实时）或 'local'（仅本机）
+let lastUpdated=null;
+let saveTimer=null;
+function payload(){return {players:state.players,matches:state.matches,restrictions:state.restrictions,settings:state.settings};}
+function setModeBadge(){
+  const el=document.getElementById('modeBadge');
+  if(!el)return;
+  if(MODE==='shared'){el.textContent='● 共享模式 · 多人实时同步';el.className='mode shared';}
+  else{el.textContent='● 本机模式 · 仅存此设备';el.className='mode local';}
+}
+async function apiGet(){const r=await fetch(API_BASE+'/api/state',{cache:'no-store'});if(!r.ok)throw new Error('http '+r.status);return r.json();}
+async function apiPost(data){
+  const r=await fetch(API_BASE+'/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok)throw new Error('http '+r.status);return true;
+}
+function save(){                                   // 任何改动都触发：本机缓存 + （共享模式）防抖推送到后端
+  const p=payload();
+  try{localStorage.setItem(STORE,JSON.stringify(p));}catch(e){}
+  if(MODE==='shared'){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>{apiPost(p).catch(()=>{});},400);
+  }
+}
+function applyState(d){
+  state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];
+  state.settings=Object.assign({numMatches:null,pmode:'none'},d.settings||{});
+  if(state.matches.length)assignRounds();
+}
+async function bootstrap(){                        // 开页：先试后端，连不上退回本机
+  try{
+    const d=await apiGet();
+    MODE='shared';applyState(d);lastUpdated=d.updatedAt||null;renderAll();setModeBadge();
+    setInterval(poll,5000);
+    return;
+  }catch(e){/* 后端不可用，退回本机 */}
+  MODE='local';
+  const raw=localStorage.getItem(STORE);
+  if(!raw){runDefaultDemo();setModeBadge();return;}
+  try{applyState(JSON.parse(raw));}catch(e){}
+  renderAll();setModeBadge();
+}
+async function poll(){                             // 共享模式：轮询后端，拾取他人改动（打字中不重绘，防吞字）
+  if(MODE!=='shared')return;
+  try{
+    const d=await apiGet();
+    if(lastUpdated&&d.updatedAt&&d.updatedAt!==lastUpdated){
+      const ae=document.activeElement;
+      const typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA');
+      lastUpdated=d.updatedAt;
+      if(!typing){applyState(d);renderAll();}   // 打字中跳过，下一次非打字态轮询自然刷新
+    }else if(!lastUpdated){lastUpdated=d.updatedAt||null;}
+  }catch(e){}
+}
+function fillRandomScores(){
+  for(const m of state.matches){
+    const w=Math.random()<0.5;
+    const win=11+Math.floor(Math.random()*11);          // 11..21
+    const lose=Math.floor(Math.random()*win);            // 0..win-1
+    if(w){m.scoreA=win;m.scoreB=lose;}else{m.scoreA=lose;m.scoreB=win;}
+  }
+  save();renderSchedule();updateStats();
+}
+function runDefaultDemo(){
+  state.players=DEFAULT_PLAYERS.map(p=>({id:Date.now()+Math.random(),name:p.name,gender:p.gender}));
+  state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'female'};
+  document.getElementById('pmode').value='female';
+  generateSchedule(12,'female');
+  fillRandomScores();
+  save();renderAll();updateSuggestion();
+  toast('已载入默认名单并生成（优先女双）+ 随机比分');
+}
+function loadDefaults(){
+  if(!confirm('载入默认 13 人名单并自动生成（优先女双）+ 随机比分，将覆盖当前数据，确定？'))return;
+  runDefaultDemo();
+}
+
+/* ---------- 选手 ---------- */
+function setGender(g){document.getElementById('pgender').value=g;}
+function addPlayer(){
+  const name=document.getElementById('pname').value.trim();
+  const gender=document.getElementById('pgender').value.trim();
+  if(!name){toast('请输入姓名');return;}
+  state.players.push({id:Date.now()+Math.random(),name,gender});
+  document.getElementById('pname').value='';document.getElementById('pgender').value='';
+  save();renderPlayers();updateSuggestion();
+}
+function removePlayer(idx){
+  const hadMatches=state.matches.length>0;
+  if(!confirm('删除该选手将移除相关限制并重新生成对阵（保留的选手数据不变），确定？'))return;
+  const newRest=[];
+  for(const r of state.restrictions){let a=r[0],b=r[1];if(a===idx||b===idx)continue;if(a>idx)a--;if(b>idx)b--;newRest.push([a,b]);}
+  state.restrictions=newRest;
+  state.players.splice(idx,1);
+  save();renderPlayers();renderRestrictions();
+  if(state.players.length>=4){generateSchedule();}
+  else{state.matches=[];assignRounds();renderSchedule();updateStats();toast('已删除选手（人数不足 4，对阵已清空）');return;}
+  toast(hadMatches?'已删除选手并重新生成对阵':'已删除选手');
+}
+function editName(idx,val){
+  val=val.trim();if(!val){toast('姓名不能为空');renderPlayers();return;}
+  state.players[idx].name=val;save();renderSchedule();updateStats();
+}
+function editGender(idx,val){state.players[idx].gender=val.trim();save();renderPlayers();renderSchedule();updateStats();}
+function renderPlayers(){
+  const c=document.getElementById('playersList');
+  const g=(i)=>{const n=normGender(state.players[i].gender);return n?`<i class="g">${esc(n)}</i>`:(state.players[i].gender?`<i class="g">${esc(state.players[i].gender)}</i>`:'');};
+  if(!state.players.length){c.innerHTML='<span class="hint">还没有选手，先在上方添加。</span>';}
+  else{c.innerHTML='<table class="ptable"><thead><tr><th>姓名</th><th>性别</th><th></th></tr></thead><tbody>'+
+    state.players.map((p,i)=>`<tr><td><input value="${esc(p.name)}" onchange="editName(${i},this.value)"></td>`+
+    `<td><input value="${esc(p.gender)}" onchange="editGender(${i},this.value)">${g(i)}</td>`+
+    `<td style="text-align:center"><span class="x" onclick="removePlayer(${i})">×</span></td></tr>`).join('')+
+    '</tbody></table>';}
+  document.getElementById('pcount').textContent=`共 ${state.players.length} 名选手`+(state.players.length<4?'（生成对阵至少需要 4 人）':'');
+  renderRestrictionSelects();
+}
+function updateSuggestion(){
+  const n=state.players.length;
+  const sug=Math.floor(n*(n-1)/4);
+  const el=document.getElementById('suggestion');
+  const inp=document.getElementById('numMatches');
+  if(n>=4){el.innerHTML=`建议全场配对：<span class="sug">${sug}</span> 场（每人搭档所有人一次）`;if(!inp.value)inp.placeholder=sug;}
+  else{el.textContent='';inp.placeholder='建议值';}
+}
+
+/* ---------- 同队限制 ---------- */
+function renderRestrictionSelects(){
+  const opts='<option value="">选择选手</option>'+state.players.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join('');
+  document.getElementById('restA').innerHTML=opts;
+  document.getElementById('restB').innerHTML=opts;
+}
+function addRestriction(){
+  const a=parseInt(document.getElementById('restA').value),b=parseInt(document.getElementById('restB').value);
+  if(isNaN(a)||isNaN(b)||a===b){toast('请选择两位不同选手');return;}
+  const key=gkey(a,b);
+  if(state.restrictions.some(r=>gkey(r[0],r[1])===key)){toast('已存在该限制');return;}
+  state.restrictions.push([a,b]);save();renderRestrictions();toast('已添加限制');
+}
+function removeRestriction(idx){state.restrictions.splice(idx,1);save();renderRestrictions();}
+function renderRestrictions(){
+  const c=document.getElementById('restList');
+  if(!state.restrictions.length){c.innerHTML='<span class="hint">暂无限制。</span>';return;}
+  c.innerHTML=state.restrictions.map((r,i)=>`<span class="pchip">${esc(state.players[r[0]].name)} ✕ ${esc(state.players[r[1]].name)}<span class="x" onclick="removeRestriction(${i})">×</span></span>`).join('');
+}
+
+/* ---------- 调度算法 ---------- */
+function combos4(n){const r=[];for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)r.push([a,b,c,d]);return r;}
+function sample4(n,k){const seen=new Set(),res=[];let g=0;while(res.length<k&&g<k*30){g++;const a=[...Array(n).keys()];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}const p=a.slice(0,4).sort((x,y)=>x-y);const kk=p.join(',');if(seen.has(kk))continue;seen.add(kk);res.push(p);}return res;}
+
+function buildScheduleGreedy(ps,num,pmode,forbidden){
+  const n=ps.length;
+  const partner={},opp={},games=new Array(n).fill(0);
+  const matches=[];const useSample=n>24;
+  const ng=i=>normGender(ps[i].gender);
+  for(let m=0;m<num;m++){
+    let best=null,bestScore=Infinity;
+    const sets=useSample?sample4(n,5000):combos4(n);
+    for(const arr of sets){
+      const [a,b,c,d]=arr;
+      const splits=[[[a,b],[c,d]],[[a,c],[b,d]],[[a,d],[b,c]]];
+      for(const t of splits){
+        const [t1,t2]=t,p1=t1[0],p2=t1[1],p3=t2[0],p4=t2[1];
+        if(forbidden.has(gkey(p1,p2))||forbidden.has(gkey(p3,p4)))continue;
+        let s=(partner[gkey(p1,p2)]||0)+(partner[gkey(p3,p4)]||0);s*=100;
+        s+=((opp[gkey(p1,p3)]||0)+(opp[gkey(p1,p4)]||0)+(opp[gkey(p2,p3)]||0)+(opp[gkey(p2,p4)]||0))*10;
+        s+=(games[p1]+games[p2]+games[p3]+games[p4]);
+        if(pmode==='mixed'){
+          if(ng(p1)&&ng(p2)&&ng(p1)===ng(p2))s+=8;
+          if(ng(p3)&&ng(p4)&&ng(p3)===ng(p4))s+=8;
+        }else if(pmode==='female'){
+          if(!(ng(p1)==='女'&&ng(p2)==='女'))s+=8;
+          if(!(ng(p3)==='女'&&ng(p4)==='女'))s+=8;
+        }
+        s+=Math.random()*0.6;
+        if(s<bestScore){bestScore=s;best={p1,p2,p3,p4};}
+      }
+    }
+    if(!best)break;
+    partner[gkey(best.p1,best.p2)]=(partner[gkey(best.p1,best.p2)]||0)+1;
+    partner[gkey(best.p3,best.p4)]=(partner[gkey(best.p3,best.p4)]||0)+1;
+    for(const pr of [[best.p1,best.p3],[best.p1,best.p4],[best.p2,best.p3],[best.p2,best.p4]])opp[gkey(pr[0],pr[1])]=(opp[gkey(pr[0],pr[1])]||0)+1;
+    games[best.p1]++;games[best.p2]++;games[best.p3]++;games[best.p4]++;
+    matches.push({teamA:[best.p1,best.p2],teamB:[best.p3,best.p4],scoreA:null,scoreB:null,round:null});
+  }
+  return matches;
+}
+function evaluateSchedule(matches){
+  const opp={};
+  for(const m of matches){
+    const [a,b]=m.teamA,[c,d]=m.teamB;
+    for(const [x,y] of [[a,c],[a,d],[b,c],[b,d]])opp[gkey(x,y)]=(opp[gkey(x,y)]||0)+1;
+  }
+  let maxOpp=0,sumSq=0;
+  for(const k in opp){const v=opp[k];if(v>maxOpp)maxOpp=v;sumSq+=v*v;}
+  return {maxOpp,sumSq};
+}
+function buildScheduleOptimized(ps,num,pmode,forbidden){
+  const n=ps.length;
+  const runs=n>20?20:(n>12?50:100);
+  let best=null,bestScore=Infinity;
+  for(let r=0;r<runs;r++){
+    const matches=buildScheduleGreedy(ps,num,pmode,forbidden);
+    if(matches.length<num)continue;
+    const ev=evaluateSchedule(matches);
+    const score=ev.maxOpp*1e9+ev.sumSq;
+    if(score<bestScore){bestScore=score;best=matches;}
+  }
+  return best||buildScheduleGreedy(ps,num,pmode,forbidden);
+}
+
+function generateSchedule(numArg,pmodeArg){
+  const ps=state.players,n=ps.length;
+  if(n<4){toast('至少需要 4 名选手');return;}
+  let num=(numArg!=null)?numArg:(parseInt(document.getElementById('numMatches').value)||Math.floor(n*(n-1)/4)||1);
+  const cap=Math.floor(n*(n-1)/2/2);
+  num=Math.max(1,Math.min(num,cap));
+  const pmode=(pmodeArg!=null)?pmodeArg:document.getElementById('pmode').value;
+  const forbidden=new Set(state.restrictions.map(r=>gkey(r[0],r[1])));
+  const matches=buildScheduleOptimized(ps,num,pmode,forbidden);
+  if(!matches.length){toast('约束过紧，无法生成对阵');return;}
+  state.matches=matches;state.settings.numMatches=num;state.settings.pmode=pmode;
+  assignRounds();save();renderSchedule();updateStats();
+  toast(`已生成 ${matches.length} 场对阵`);
+}
+function assignRounds(){
+  const rounds=[];
+  for(const mt of state.matches){
+    const ps=new Set([...mt.teamA,...mt.teamB]);let placed=false;
+    for(const r of rounds){let ok=true;for(const x of ps)if(r.players.has(x)){ok=false;break;}if(ok){for(const x of ps)r.players.add(x);r.matches.push(mt);placed=true;break;}}
+    if(!placed)rounds.push({players:new Set(ps),matches:[mt]});
+  }
+  rounds.forEach((r,idx)=>r.matches.forEach(m=>m.round=idx+1));
+}
+
+/* ---------- 对阵渲染 ---------- */
+function renderSchedule(){
+  const c=document.getElementById('schedule');
+  document.getElementById('scoreActions').style.display=state.matches.length?'flex':'none';
+  if(!state.matches.length){c.innerHTML='<p class="empty">尚未生成对阵。添加至少 4 名选手后点击「生成对阵」。</p>';return;}
+  const byRound={};
+  state.matches.forEach((m,idx)=>{m._idx=idx;(byRound[m.round||1]=byRound[m.round||1]||[]).push(m);});
+  let html='';
+  Object.keys(byRound).sort((a,b)=>a-b).forEach(r=>{
+    html+=`<h3 class="round">第 ${r} 轮</h3><div class="matches">`;
+    byRound[r].forEach(m=>{
+      const i=m._idx;
+      const ta=m.teamA.map(ply).join(' / '),tb=m.teamB.map(ply).join(' / ');
+      const a=m.scoreA,b=m.scoreB;let clsA='',clsB='',badgeCls='pending',badgeTxt='未赛';
+      if(a!=null&&b!=null&&a!==''&&b!==''){const A=+a,B=+b;if(A>B){clsA=' win';clsB=' lose';badgeCls='win';badgeTxt='A 胜';}else if(B>A){clsB=' win';clsA=' lose';badgeCls='win';badgeTxt='B 胜';}else{badgeCls='draw';badgeTxt='平';}}
+      html+=`<div class="match" data-i="${i}"><button class="del" title="移除对阵" onclick="removeMatch(${i})">×</button><div class="teams"><span class="team teamA${clsA}">${ta}</span><span class="vs">VS</span><span class="team teamB${clsB}">${tb}</span></div>
+      <div class="score"><input type="text" inputmode="numeric" pattern="[0-9]*" min="0" data-mid="${i}" data-side="A" value="${a==null?'':a}" placeholder="–" oninput="onScore(this)"><span class="colon">:</span><input type="text" inputmode="numeric" pattern="[0-9]*" min="0" data-mid="${i}" data-side="B" value="${b==null?'':b}" placeholder="–" oninput="onScore(this)"><span class="badge ${badgeCls}" data-badge>${badgeTxt}</span></div></div>`;
+    });
+    html+='</div>';
+  });
+  c.innerHTML=html;
+}
+function onScore(el){
+  const i=+el.dataset.mid,side=el.dataset.side;
+  let v=el.value.replace(/[^0-9]/g,'');            // 仅保留数字，兼容手写/拼音键盘
+  if(v!==el.value)el.value=v;
+  state.matches[i][side==='A'?'scoreA':'scoreB']=v===''?null:v;
+  save();
+  // 仅就地更新该场的胜负号与徽章，避免重建输入框导致两位数输不进
+  const card=el.closest('.match');
+  if(card){
+    const m=state.matches[i];
+    const a=m.scoreA,b=m.scoreB;
+    const ta=card.querySelector('.teamA'),tb=card.querySelector('.teamB'),badge=card.querySelector('[data-badge]');
+    ta.classList.remove('win','lose');tb.classList.remove('win','lose');
+    if(a!=null&&b!=null&&a!==''&&b!==''){
+      const A=+a,B=+b;
+      if(A>B){ta.classList.add('win');tb.classList.add('lose');badge.className='badge win';badge.textContent='A 胜';}
+      else if(B>A){tb.classList.add('win');ta.classList.add('lose');badge.className='badge win';badge.textContent='B 胜';}
+      else{badge.className='badge draw';badge.textContent='平';}
+    }else{badge.className='badge pending';badge.textContent='未赛';}
+  }
+  updateStats();
+}
+function removeMatch(idx){
+  if(!confirm('移除这场对阵？'))return;
+  state.matches.splice(idx,1);assignRounds();save();renderSchedule();updateStats();toast('已移除对阵');
+}
+function clearScores(){
+  if(!confirm('清空所有已录入的比分？'))return;
+  state.matches.forEach(m=>{m.scoreA=null;m.scoreB=null;});save();renderSchedule();updateStats();toast('已清空比分');
+}
+
+/* ---------- 统计 ---------- */
+function getTier(games,wins){if(!games)return '–';const wr=wins/games*100;if(wr>=75)return 'S';if(wr>=50)return 'A';return 'B';}
+function computeStats(){
+  const stats=state.players.map((p,i)=>({i,name:p.name,gender:p.gender,wins:0,losses:0,draws:0,games:0,pf:0,pa:0,pd:0}));
+  for(const m of state.matches){
+    if(m.scoreA==null||m.scoreB==null||m.scoreA===''||m.scoreB==='')continue;
+    const A=+m.scoreA,B=+m.scoreB;if(isNaN(A)||isNaN(B))continue;
+    const w=A>B?'A':B>A?'B':null;
+    for(const idx of m.teamA){const s=stats[idx];s.games++;s.pf+=A;s.pa+=B;s.pd+=A-B;if(w==='A')s.wins++;else if(w==='B')s.losses++;else s.draws++;}
+    for(const idx of m.teamB){const s=stats[idx];s.games++;s.pf+=B;s.pa+=A;s.pd+=B-A;if(w==='B')s.wins++;else if(w==='A')s.losses++;else s.draws++;}
+  }
+  return stats;
+}
+function computeDetail(){
+  const n=state.players.length;
+  const partners=Array.from({length:n},()=>({})),opponents=Array.from({length:n},()=>({})),appear=new Array(n).fill(0);
+  for(const m of state.matches){const A=m.teamA,B=m.teamB;[...A,...B].forEach(x=>appear[x]++);
+    const inc=(map,i,j)=>{map[i][j]=(map[i][j]||0)+1;};
+    inc(partners,A[0],A[1]);inc(partners,A[1],A[0]);inc(partners,B[0],B[1]);inc(partners,B[1],B[0]);
+    A.forEach(x=>B.forEach(y=>inc(opponents,x,y)));B.forEach(x=>A.forEach(y=>inc(opponents,x,y)));}
+  return {partners,opponents,appear};
+}
+function coverage(){
+  const n=state.players.length,total=n*(n-1)/2,partner={},opp={};
+  for(const m of state.matches){const [a,b]=m.teamA,[c,d]=m.teamB;
+    partner[gkey(a,b)]=(partner[gkey(a,b)]||0)+1;partner[gkey(c,d)]=(partner[gkey(c,d)]||0)+1;
+    for(const [x,y] of [[a,c],[a,d],[b,c],[b,d]])opp[gkey(x,y)]=(opp[gkey(x,y)]||0)+1;}
+  let used=0,maxOpp=0,sum=0,cnt=0;
+  for(const k in partner)if(partner[k]>0)used++;
+  for(const k in opp){if(opp[k]>maxOpp)maxOpp=opp[k];sum+=opp[k];cnt++;}
+  const played=state.matches.filter(m=>m.scoreA!=null&&m.scoreA!==''&&m.scoreB!=null&&m.scoreB!=='').length;
+  return {total,used,maxOpp,avg:cnt?(sum/cnt):0,played};
+}
+function updateStats(){
+  const cov=coverage();
+  document.getElementById('coverage').innerHTML=
+    `<div class="item"><b>${cov.used}/${cov.total}</b><span>搭档配对覆盖</span></div>`+
+    `<div class="item"><b>${cov.maxOpp}</b><span>对手最多同组次数（越平均越好）</span></div>`+
+    `<div class="item"><b>${cov.played}/${state.matches.length}</b><span>已赛 / 总场</span></div>`;
+  renderRanking();renderDetail();
+}
+function renderRanking(){
+  if(state._curTab==='players'){
+    const stats=computeStats();
+    const arr=[...stats].sort((x,y)=>{
+      const wrx=x.games?x.wins/x.games:0,wry=y.games?y.wins/y.games:0;
+      return wry-wrx||y.wins-x.wins||y.pd-x.pd||x.name.localeCompare(y.name,'zh');
+    });
+    const maxv=Math.max(1,...arr.map(s=>Math.max(s.wins,s.losses)));
+    let html='<div class="butterfly">';
+    html+='<div class="bf-head"><span class="bf-h-l">胜场</span><span class="bf-h-c">选手 · 胜率</span><span class="bf-h-r">负场</span></div>';
+    if(!arr.length)html+='<p class="empty">暂无数据</p>';
+    arr.forEach((s,k)=>{
+      const wr=s.games?Math.round(s.wins/s.games*100):0;
+      const tier=getTier(s.games,s.wins);
+      const wpct=Math.round(s.wins/maxv*100),lpct=Math.round(s.losses/maxv*100);
+      const ng=normGender(s.gender);
+      html+=`<div class="bf-row">`+
+        `<div class="bf-side bf-left"><span class="bf-val">${s.wins}</span><div class="bf-track"><div class="bf-bar bf-win" style="width:${wpct}%" title="胜 ${s.wins}"></div></div></div>`+
+        `<div class="bf-center"><span class="bf-name">${esc(s.name)}${ng?` <i class="g">${esc(ng)}</i>`:(s.gender?` <i class="g">${esc(s.gender)}</i>`:'')}</span><span class="bf-rate"><span class="tier tier-${tier}">${tier}</span>${wr}%</span></div>`+
+        `<div class="bf-side bf-right"><div class="bf-track"><div class="bf-bar bf-lose" style="width:${lpct}%" title="负 ${s.losses}"></div></div><span class="bf-val">${s.losses}</span></div>`+
+      `</div>`;
+    });
+    html+='</div>';
+    document.getElementById('rankPlayers').innerHTML=html;
+  }else if(state._curTab==='teams'){
+    const teams={};
+    for(const m of state.matches){
+      if(m.scoreA==null||m.scoreB==null||m.scoreA===''||m.scoreB==='')continue;
+      const A=+m.scoreA,B=+m.scoreB;if(isNaN(A)||isNaN(B))continue;
+      const w=A>B?'A':B>A?'B':null;
+      recTeam(teams,m.teamA,A,B,w==='A');recTeam(teams,m.teamB,B,A,w==='B');
+    }
+    const arr=Object.values(teams).sort((x,y)=>y.wins-x.wins||y.pd-x.pd||y.pf-x.pf);
+    let html='<table class="rktable"><thead><tr><th>排名</th><th class="name">搭档组合</th><th>场次</th><th>胜</th><th>负</th><th>净胜</th></tr></thead><tbody>';
+    if(!arr.length)html+='<tr><td colspan="6" class="empty">暂无数据</td></tr>';
+    arr.forEach((t,k)=>{html+=`<tr><td class="rank">${k+1}</td><td class="name">${ply(t.pair[0])} / ${ply(t.pair[1])}</td><td>${t.games}</td><td>${t.wins}</td><td>${t.losses}</td><td><b style="color:${t.pd>=0?'var(--primary-dark)':'#b9443a'}">${t.pd>0?'+':''}${t.pd}</b></td></tr>`;});
+    html+='</tbody></table>';
+    document.getElementById('rankTeams').innerHTML=html;
+  }
+}
+function recTeam(teams,pair,pf,pa,win){const p=[...pair].sort((x,y)=>x-y);const k=p[0]+'-'+p[1];
+  const t=teams[k]||(teams[k]={pair:p,wins:0,losses:0,games:0,pf:0,pa:0,pd:0});
+  t.games++;t.pf+=pf;t.pa+=pa;t.pd+=pf-pa;if(win)t.wins++;else t.losses++;}
+function renderDetail(){
+  if(state._curTab!=='detail')return;
+  const {partners,opponents,appear}=computeDetail();
+  let html='<div class="detail">';
+  state.players.forEach((p,i)=>{
+    const pn=Object.entries(partners[i]).sort((a,b)=>b[1]-a[1]).map(([j,c])=>`<span class="dchip">${esc(state.players[j].name)}<b>×${c}</b></span>`).join('')||'<span class="hint">—</span>';
+    const op=Object.entries(opponents[i]).sort((a,b)=>b[1]-a[1]).map(([j,c])=>`<span class="dchip">${esc(state.players[j].name)}<b>×${c}</b></span>`).join('')||'<span class="hint">—</span>';
+    html+=`<div class="dcard"><div class="dhead">${esc(p.name)} ${normGender(p.gender)?`<i class="g">${esc(normGender(p.gender))}</i>`:(p.gender?`<i class="g">${esc(p.gender)}</i>`:'')} <span class="hint">已排 ${appear[i]} 场</span></div><div class="drow"><span class="dlabel">搭档</span>${pn}</div><div class="drow"><span class="dlabel">对手</span>${op}</div></div>`;
+  });
+  html+='</div>';
+  document.getElementById('rankDetail').innerHTML=html;
+}
+function switchTab(which,el){
+  state._curTab=which;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  document.getElementById('rankPlayers').style.display=which==='players'?'block':'none';
+  document.getElementById('rankTeams').style.display=which==='teams'?'block':'none';
+  document.getElementById('rankDetail').style.display=which==='detail'?'block':'none';
+  renderRanking();renderDetail();
+}
+
+/* ---------- 备份 ---------- */
+function exportJSON(){const d=JSON.stringify({players:state.players,matches:state.matches,restrictions:state.restrictions,settings:state.settings});
+  const blob=new Blob([d],{type:'application/json'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='羽球双打轮转_'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出备份');}
+function importJSON(input){const f=input.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];state.settings=Object.assign({numMatches:null,pmode:'none'},d.settings||{});if(state.matches.length)assignRounds();save();renderAll();toast('导入成功');}catch(e){toast('文件格式错误');}};
+  r.readAsText(f);input.value='';}
+function resetAll(){if(!confirm('确定清空全部选手、限制、对阵与比分？'))return;state.players=[];state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'none'};save();renderAll();toast('已清空全部');}
+
+/* ---------- 初始化 ---------- */
+function renderAll(){renderPlayers();updateSuggestion();renderRestrictions();renderSchedule();updateStats();}
+bootstrap();
+</script>
+</body>
+</html>

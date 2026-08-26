@@ -1,0 +1,12 @@
+{
+  "name": "badminton-doubles-shared",
+  "version": "1.0.0",
+  "description": "羽球双打轮转共享版：网页 + 零依赖 Node 后端，多人实时填写同一份赛事数据",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "private": true
+}

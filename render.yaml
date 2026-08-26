@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: badminton-shared
+    runtime: node
+    plan: starter
+    buildCommand: "echo 'no build'"
+    startCommand: "node server.js"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "3000"
