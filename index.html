@@ -361,7 +361,9 @@ function runDefaultDemo(){
   state.players=DEFAULT_PLAYERS.map(p=>({id:Date.now()+Math.random(),name:p.name,gender:p.gender}));
   state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'female'};
   document.getElementById('pmode').value='female';
-  generateSchedule(12,'female');
+  const v=parseInt(document.getElementById('numMatches').value);
+  const num=(v&&v>0)?v:12;   // 尊重「比赛场数」输入；未填才用默认 12
+  generateSchedule(num,'female');
   fillRandomScores();
   save();renderAll();updateSuggestion();
   toast('已载入默认名单并生成（优先女双）+ 随机比分');
