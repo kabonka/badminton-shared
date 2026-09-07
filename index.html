@@ -213,7 +213,7 @@
           </div>
         </div>
         <p class="hint" id="suggestion"></p>
-        <p class="hint">对阵规则：男双不对女双 · 男双不对含小孩组合 · 一队不能两个小孩</p>
+        <p class="hint">对阵规则：男双不对女双 · 男双不对含小孩组合 · 男女混双不对女+小孩 · 一队不能两个小孩</p>
         <div class="actions">
           <button class="btn-primary" onclick="generateSchedule()">⚙ 生成对阵</button>
           <button class="btn-ghost" onclick="generateSchedule()">↻ 重新生成</button>
@@ -455,15 +455,17 @@ function buildScheduleGreedy(ps,num,pmode,forbidden){
   const ng=i=>normGender(ps[i].gender);
   // 队伍合法性：一队不能两个小孩
   const teamLegal=(x,y)=>!(ng(x)==='小孩'&&ng(y)==='小孩');
-  // 队伍属性：男双 / 女双 / 含小孩
-  const teamTag=(x,y)=>{const a=ng(x),b=ng(y);return {mm:a==='男'&&b==='男',ff:a==='女'&&b==='女',kid:a==='小孩'||b==='小孩'};};
-  // 对阵合法性：男双不对女双；男双不对含小孩组合
+  // 队伍属性：男双 / 女双 / 含小孩 / 男女混双 / 女+小孩
+  const teamTag=(x,y)=>{const a=ng(x),b=ng(y);return {mm:a==='男'&&b==='男',ff:a==='女'&&b==='女',kid:a==='小孩'||b==='小孩',mf:(a==='男'&&b==='女')||(a==='女'&&b==='男'),ffk:(a==='女'&&b==='小孩')||(a==='小孩'&&b==='女')};};
+  // 对阵合法性：男双不对女双；男双不对含小孩组合；男女混双不对女+小孩
   const matchupLegal=(x1,x2,y1,y2)=>{
     const A=teamTag(x1,x2),B=teamTag(y1,y2);
     if(A.mm&&B.ff)return false;
     if(A.ff&&B.mm)return false;
     if(A.mm&&B.kid)return false;
     if(A.kid&&B.mm)return false;
+    if(A.mf&&B.ffk)return false;
+    if(A.ffk&&B.mf)return false;
     return true;
   };
   for(let m=0;m<num;m++){
