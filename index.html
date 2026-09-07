@@ -169,11 +169,12 @@
         <h2>① 选手录入 <span class="tag">列表可编辑</span></h2>
         <label>姓名 / 昵称</label>
         <input type="text" id="pname" placeholder="如：阿强、Lily" onkeydown="if(event.key==='Enter')addPlayer()">
-        <label>性别（自由填，自动归为 男 / 女）</label>
-        <input type="text" id="pgender" placeholder="男 / 女 / M / F …" onkeydown="if(event.key==='Enter')addPlayer()">
+        <label>性别（自由填，自动归为 男 / 女 / 小孩）</label>
+        <input type="text" id="pgender" placeholder="男 / 女 / 小孩 / M / F …" onkeydown="if(event.key==='Enter')addPlayer()">
         <div class="chips">
           <span class="chip" onclick="setGender('男')">男</span>
           <span class="chip" onclick="setGender('女')">女</span>
+          <span class="chip" onclick="setGender('小孩')">小孩</span>
           <span class="chip" onclick="setGender('')">清空</span>
         </div>
         <div class="actions">
@@ -212,6 +213,7 @@
           </div>
         </div>
         <p class="hint" id="suggestion"></p>
+        <p class="hint">对阵规则：男双不对女双 · 男双不对含小孩组合 · 一队不能两个小孩</p>
         <div class="actions">
           <button class="btn-primary" onclick="generateSchedule()">⚙ 生成对阵</button>
           <button class="btn-ghost" onclick="generateSchedule()">↻ 重新生成</button>
@@ -275,8 +277,8 @@
 const STORE='bd_v1';
 const DEFAULT_PLAYERS=[
   {name:'往往',gender:'M'},{name:'kenny',gender:'M'},{name:'Kabonka',gender:'F'},
-  {name:'jaden很淡',gender:'M'},{name:'慧如OA',gender:'F'},{name:'Jimmy',gender:'M'},
-  {name:'果果',gender:'M'},{name:'Semon',gender:'M'},{name:'CarL',gender:'M'},
+  {name:'jaden',gender:'小孩'},{name:'慧如OA',gender:'F'},{name:'Jimmy',gender:'M'},
+  {name:'果果',gender:'小孩'},{name:'Semon',gender:'M'},{name:'CarL',gender:'M'},
   {name:'颖颖',gender:'F'},{name:'小可',gender:'F'},{name:'郭荣裕',gender:'M'},{name:'吴明谕',gender:'M'}
 ];
 const state={players:[],matches:[],restrictions:[],settings:{numMatches:null,pmode:'none'},_curTab:'players'};
@@ -287,6 +289,7 @@ function gkey(i,j){return i<j?i+'-'+j:j+'-'+i;}
 function normGender(g){
   if(!g)return '';
   const s=String(g).trim().toLowerCase();
+  if(/小孩|儿童|小童|小朋友|child|kid/.test(s))return '小孩';
   if(/女|f|female|girl|0|姐|妹|娘|小姐|婆|母|woman|lady/.test(s))return '女';
   if(/男|m|male|boy|1|哥|弟|爷|汉|先生|公|man|mr/.test(s))return '男';
   return String(g).trim();
@@ -450,6 +453,19 @@ function buildScheduleGreedy(ps,num,pmode,forbidden){
   const partner={},opp={},games=new Array(n).fill(0);
   const matches=[];const useSample=n>24;
   const ng=i=>normGender(ps[i].gender);
+  // 队伍合法性：一队不能两个小孩
+  const teamLegal=(x,y)=>!(ng(x)==='小孩'&&ng(y)==='小孩');
+  // 队伍属性：男双 / 女双 / 含小孩
+  const teamTag=(x,y)=>{const a=ng(x),b=ng(y);return {mm:a==='男'&&b==='男',ff:a==='女'&&b==='女',kid:a==='小孩'||b==='小孩'};};
+  // 对阵合法性：男双不对女双；男双不对含小孩组合
+  const matchupLegal=(x1,x2,y1,y2)=>{
+    const A=teamTag(x1,x2),B=teamTag(y1,y2);
+    if(A.mm&&B.ff)return false;
+    if(A.ff&&B.mm)return false;
+    if(A.mm&&B.kid)return false;
+    if(A.kid&&B.mm)return false;
+    return true;
+  };
   for(let m=0;m<num;m++){
     let best=null,bestScore=Infinity;
     const sets=useSample?sample4(n,5000):combos4(n);
@@ -459,6 +475,8 @@ function buildScheduleGreedy(ps,num,pmode,forbidden){
       for(const t of splits){
         const [t1,t2]=t,p1=t1[0],p2=t1[1],p3=t2[0],p4=t2[1];
         if(forbidden.has(gkey(p1,p2))||forbidden.has(gkey(p3,p4)))continue;
+        if(!teamLegal(p1,p2)||!teamLegal(p3,p4))continue;
+        if(!matchupLegal(p1,p2,p3,p4))continue;
         let s=(partner[gkey(p1,p2)]||0)+(partner[gkey(p3,p4)]||0);s*=100;
         s+=((opp[gkey(p1,p3)]||0)+(opp[gkey(p1,p4)]||0)+(opp[gkey(p2,p3)]||0)+(opp[gkey(p2,p4)]||0))*10;
         s+=(games[p1]+games[p2]+games[p3]+games[p4]);
@@ -466,8 +484,10 @@ function buildScheduleGreedy(ps,num,pmode,forbidden){
           if(ng(p1)&&ng(p2)&&ng(p1)===ng(p2))s+=8;
           if(ng(p3)&&ng(p4)&&ng(p3)===ng(p4))s+=8;
         }else if(pmode==='female'){
-          if(!(ng(p1)==='女'&&ng(p2)==='女'))s+=8;
-          if(!(ng(p3)==='女'&&ng(p4)==='女'))s+=8;
+          // 女双 或 含小孩组合 视为优先（小孩不能对男双，需优先安排出去）
+          const gd=(x,y)=>{const a=ng(x),b=ng(y);return (a==='女'&&b==='女')||a==='小孩'||b==='小孩';};
+          if(!gd(p1,p2))s+=8;
+          if(!gd(p3,p4))s+=8;
         }
         s+=Math.random()*0.6;
         if(s<bestScore){bestScore=s;best={p1,p2,p3,p4};}
