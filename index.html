@@ -261,7 +261,8 @@
 
   <footer>
     <span id="footerBtns">
-      <button class="btn-ghost btn-sm" onclick="exportJSON()">导出备份</button>
+      <button class="btn-ghost btn-sm" onclick="exportToFolder()">导出到文件夹</button>
+      <button class="btn-ghost btn-sm" onclick="exportJSON()">导出备份(JSON)</button>
       <button class="btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">导入备份</button>
       <button class="btn-danger btn-sm" onclick="resetAll()">清空全部</button>
     </span>
@@ -718,6 +719,116 @@ function importJSON(input){const f=input.files[0];if(!f)return;const r=new FileR
   r.onload=()=>{try{const d=JSON.parse(r.result);state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];state.settings=Object.assign({numMatches:null,pmode:'none'},d.settings||{});if(state.matches.length)assignRounds();save();renderAll();toast('导入成功');}catch(e){toast('文件格式错误');}};
   r.readAsText(f);input.value='';}
 function resetAll(){if(!confirm('确定清空全部选手、限制、对阵与比分？'))return;state.players=[];state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'none'};save();renderAll();toast('已清空全部');}
+
+/* ---------- 导出到文件夹（File System Access API） ---------- */
+function downloadFile(name,content,mime){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function _snapshotStats(){
+  const P=state.players,M=state.matches,n=P.length;
+  const ng=i=>normGender(P[i]&&P[i].gender);
+  const K=(a,b)=>[a,b].sort((x,y)=>x-y).join('-');
+  const games=new Array(n).fill(0),partner={},opp={};
+  for(const m of M){const [a,b]=m.teamA,[c,e]=m.teamB;
+    partner[K(a,b)]=(partner[K(a,b)]||0)+1;partner[K(c,e)]=(partner[K(c,e)]||0)+1;
+    for(const [x,y] of [[a,c],[a,e],[b,c],[b,e]])opp[K(x,y)]=(opp[K(x,y)]||0)+1;
+    games[a]++;games[b]++;games[c]++;games[e]++;}
+  const oc=Object.values(opp);
+  const scored=M.filter(m=>m.scoreA!=null&&m.scoreA!==''&&m.scoreB!=null&&m.scoreB!=='');
+  const wins=new Array(n).fill(0),loss=new Array(n).fill(0);
+  for(const m of scored){const aw=+m.scoreA,bw=+m.scoreB;if(isNaN(aw)||isNaN(bw))continue;const Awin=aw>bw;
+    [m.teamA[0],m.teamA[1]].forEach(i=>{if(Awin)wins[i]++;else loss[i]++;});
+    [m.teamB[0],m.teamB[1]].forEach(i=>{if(Awin)loss[i]++;else wins[i]++;});}
+  const rows=P.map((p,i)=>{const tot=wins[i]+loss[i];const wr=tot?wins[i]/tot:0;
+    const grade=tot?(wr>=0.75?'S':wr>=0.5?'A':'B'):'-';
+    return {i,name:p.name,g:ng(i),games:games[i],wins:wins[i],loss:loss[i],wr,grade};});
+  rows.sort((a,b)=>b.wins-a.wins||b.wr-a.wr||String(a.name).localeCompare(String(b.name)));
+  return {n,games,partner,oc,scored,rows};
+}
+function buildSnapshotHTML(){
+  const P=state.players,M=state.matches;
+  const ng=i=>normGender(P[i]&&P[i].gender);
+  const nm=i=>(P[i]?P[i].name:'?');
+  const s=_snapshotStats();
+  const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const stamp=new Date().toISOString().slice(0,10);
+  const playersHtml=P.map(p=>`<span class="chip"><b>${esc(p.name)}</b><span>${esc(ng(P.indexOf(p)))}</span></span>`).join('');
+  const matchRows=M.map((m,idx)=>{
+    const A=m.teamA.map(nm).join(' ＋ '),B=m.teamB.map(nm).join(' ＋ ');
+    const sc=(m.scoreA!=null&&m.scoreA!==''&&m.scoreB!=null&&m.scoreB!=='')?`${esc(m.scoreA)} : ${esc(m.scoreB)}`:'– : –';
+    const r=m.round||Math.ceil((idx+1)/2);
+    return `<tr><td><span class="round-tag">R${r}</span></td><td class="c">${idx+1}</td><td class="teamA">${esc(A)}</td><td class="c score">${sc}</td><td class="teamB">${esc(B)}</td></tr>`;
+  }).join('');
+  const rankRows=s.rows.map((r,i)=>{const wrpct=r.wins+r.loss?Math.round(r.wr*100)+'%':'–';
+    return `<tr><td class="c">${i+1}</td><td><b>${esc(r.name)}</b></td><td class="c">${esc(r.g)}</td><td class="c">${r.games}</td><td class="c">${r.wins}</td><td class="c">${r.loss}</td><td class="c">${wrpct}</td><td class="c"><span class="grade g${r.grade}">${r.grade}</span></td></tr>`;
+  }).join('');
+  const gmin=s.n?s.games.reduce((a,b)=>Math.min(a,b)):0,gmax=s.n?s.games.reduce((a,b)=>Math.max(a,b)):0;
+  const statsHtml=[
+    ['参赛人数',s.n+' 人'],['总场数',M.length+' 场'],
+    ['每人出场',gmin+' ~ '+gmax+' 场'],
+    ['对手组合覆盖',s.oc.length+' / '+(s.n*(s.n-1)/2)],
+    ['重复搭档',Object.values(s.partner).filter(v=>v>1).length+' 组'],
+    ['交手次数上限',(s.oc.length?Math.max(...s.oc):0)+' 次'],
+    ['已录入比分',s.scored.length+' 场'],
+  ].map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>羽球双打对阵表 · ${stamp}</title>
+<style>
+:root{--green:#2e7d52;--green-l:#e8f3ec;--green-d:#1e5c3a;--ink:#1f2933;--muted:#6b7684;--line:#dfe5e0;--bg:#f7faf8;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--ink);padding:24px 16px;line-height:1.6}
+.wrap{max-width:900px;margin:0 auto}
+header{border-bottom:3px solid var(--green);padding-bottom:14px;margin-bottom:20px}
+h1{font-size:22px;color:var(--green-d);letter-spacing:.5px}
+.meta{font-size:12.5px;color:var(--muted);margin-top:6px}
+h2{font-size:15px;color:var(--green-d);margin:22px 0 10px;padding-left:9px;border-left:4px solid var(--green)}
+.players{display:flex;flex-wrap:wrap;gap:7px}
+.chip{background:var(--green-l);border:1px solid var(--line);border-radius:14px;padding:4px 12px;font-size:13px;color:var(--green-d)}
+.chip b{font-weight:600}.chip span{color:var(--muted);font-size:11.5px;margin-left:4px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
+th{background:var(--green);color:#fff;font-weight:600;padding:9px 8px;text-align:left}
+th.c,td.c{text-align:center}
+td{padding:8px;border-bottom:1px solid var(--line)}
+tr:nth-child(even) td{background:#fbfdfc}
+.teamA{color:var(--green-d);font-weight:600}.teamB{color:#37474f;font-weight:600}.score{color:var(--muted);font-variant-numeric:tabular-nums}
+.round-tag{display:inline-block;background:var(--green-l);color:var(--green-d);border-radius:10px;padding:1px 9px;font-size:12px;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:11px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.stat .k{font-size:11.5px;color:var(--muted)}.stat .v{font-size:19px;font-weight:700;color:var(--green-d);margin-top:2px}
+.grade{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;font-weight:700;color:#fff}
+.gS{background:#c0392b}.gA{background:#2e7d52}.gB{background:#7f8c8d}.g-{background:#bbb}
+footer{margin-top:24px;font-size:11.5px;color:var(--muted);text-align:center}
+@media print{body{background:#fff;padding:0}th{background:var(--green)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body><div class="wrap">
+<header><h1>羽球双打轮转 · 对阵表（${M.length} 场）</h1><div class="meta">快照日期：${stamp} &nbsp;|&nbsp; 来源：本机/共享版导出</div></header>
+<h2>参赛名单（${s.n} 人）</h2><div class="players">${playersHtml}</div>
+<h2>对阵安排</h2>
+<table><thead><tr><th style="width:52px">轮次</th><th style="width:42px" class="c">场</th><th>队伍 A</th><th style="width:96px" class="c">比分</th><th>队伍 B</th></tr></thead><tbody>${matchRows}</tbody></table>
+<h2>排名（胜场优先 · 同胜场比胜率）</h2>
+<table><thead><tr><th style="width:42px" class="c">#</th><th>选手</th><th style="width:48px" class="c">性别</th><th style="width:48px" class="c">出场</th><th style="width:48px" class="c">胜</th><th style="width:48px" class="c">负</th><th style="width:62px" class="c">胜率</th><th style="width:48px" class="c">等级</th></tr></thead><tbody>${rankRows}</tbody></table>
+<h2>排程质量</h2><div class="stats">${statsHtml}</div>
+<footer>羽球双打轮转 · 静态快照 · 非实时数据</footer></div></body></html>`;
+}
+async function exportToFolder(){
+  const stamp=new Date().toISOString().slice(0,10);
+  const jsonStr=JSON.stringify({players:state.players,matches:state.matches,restrictions:state.restrictions,settings:state.settings},null,2);
+  const htmlStr=buildSnapshotHTML();
+  if(window.showDirectoryPicker){
+    try{
+      const dir=await window.showDirectoryPicker();
+      const jf=await dir.getFileHandle(stamp+'.json',{create:true});
+      const wj=await jf.createWritable();await wj.write(jsonStr);await wj.close();
+      const hf=await dir.getFileHandle(stamp+'.html',{create:true});
+      const wh=await hf.createWritable();await wh.write(htmlStr);await wh.close();
+      toast('已导出：'+stamp+'.json / .html');
+      return;
+    }catch(e){ if(e.name==='AbortError')return; /* 不支持或拒绝，落到回退 */ }
+  }
+  downloadFile(stamp+'.json',jsonStr,'application/json');
+  downloadFile(stamp+'.html',htmlStr,'text/html');
+  toast('已下载到下载文件夹（浏览器不支持直接写盘）');
+}
 
 /* ---------- 初始化 ---------- */
 function renderAll(){renderPlayers();updateSuggestion();renderRestrictions();renderSchedule();updateStats();}
