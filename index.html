@@ -135,6 +135,12 @@
   .mode{font-size:12px;font-weight:600;padding:4px 12px;border-radius:20px;display:inline-block}
   .mode.shared{background:var(--win);color:var(--primary-dark)}
   .mode.local{background:#eef2f0;color:var(--muted)}
+  .switch{position:relative;display:inline-block;width:42px;height:22px;flex:0 0 auto}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;cursor:pointer;inset:0;background:#cdd9d2;border-radius:22px;transition:.2s}
+  .slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + .slider{background:var(--primary)}
+  .switch input:checked + .slider:before{transform:translateX(20px)}
   @media(max-width:560px){
     .wrap{padding:12px 10px 56px}
     .grid{gap:12px}
@@ -214,9 +220,13 @@
         </div>
         <p class="hint" id="suggestion"></p>
         <p class="hint">对阵规则：男双不对女双 · 男双不对含小孩组合 · 男女混双不对女+小孩 · 一队不能两个小孩</p>
+        <div style="display:flex;align-items:center;margin:6px 0 2px">
+          <label style="margin:0 8px 0 0;font-size:12px;color:var(--muted)">套用对阵规则</label>
+          <label class="switch"><input type="checkbox" id="useRules" checked onchange="onRulesToggle()"><span class="slider"></span></label>
+          <span class="hint" id="rulesState" style="margin:0 0 0 8px">开：限制对阵组合</span>
+        </div>
         <div class="actions">
           <button class="btn-primary" onclick="generateSchedule()">⚙ 生成对阵</button>
-          <button class="btn-ghost" onclick="generateSchedule()">↻ 重新生成</button>
         </div>
       </div>
     </div>
@@ -282,7 +292,7 @@ const DEFAULT_PLAYERS=[
   {name:'果果',gender:'小孩'},{name:'Semon',gender:'M'},{name:'CarL',gender:'M'},
   {name:'颖颖',gender:'F'},{name:'小可',gender:'F'},{name:'郭荣裕',gender:'M'},{name:'吴明谕',gender:'M'}
 ];
-const state={players:[],matches:[],restrictions:[],settings:{numMatches:null,pmode:'none'},_curTab:'players'};
+const state={players:[],matches:[],restrictions:[],settings:{numMatches:null,pmode:'none',useRules:true},_curTab:'players'};
 
 /* ---------- 工具 ---------- */
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -324,7 +334,7 @@ function save(){                                   // 任何改动都触发：�
 }
 function applyState(d){
   state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];
-  state.settings=Object.assign({numMatches:null,pmode:'none'},d.settings||{});
+  state.settings=Object.assign({numMatches:null,pmode:'none',useRules:true},d.settings||{});
   if(state.matches.length)assignRounds();
 }
 async function bootstrap(){                        // 开页：先试后端，连不上退回本机
@@ -363,7 +373,7 @@ function fillRandomScores(){
 }
 function runDefaultDemo(){
   state.players=DEFAULT_PLAYERS.map(p=>({id:Date.now()+Math.random(),name:p.name,gender:p.gender}));
-  state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'female'};
+  state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'female',useRules:true};
   document.getElementById('pmode').value='female';
   const v=parseInt(document.getElementById('numMatches').value);
   const num=(v&&v>0)?v:12;   // 尊重「比赛场数」输入；未填才用默认 12
@@ -449,7 +459,7 @@ function renderRestrictions(){
 function combos4(n){const r=[];for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)r.push([a,b,c,d]);return r;}
 function sample4(n,k){const seen=new Set(),res=[];let g=0;while(res.length<k&&g<k*30){g++;const a=[...Array(n).keys()];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}const p=a.slice(0,4).sort((x,y)=>x-y);const kk=p.join(',');if(seen.has(kk))continue;seen.add(kk);res.push(p);}return res;}
 
-function buildScheduleGreedy(ps,num,pmode,forbidden){
+function buildScheduleGreedy(ps,num,pmode,forbidden,useRules){
   const n=ps.length;
   const partner={},opp={},games=new Array(n).fill(0);
   const matches=[];const useSample=n>24;
@@ -479,7 +489,7 @@ function buildScheduleGreedy(ps,num,pmode,forbidden){
         const [t1,t2]=t,p1=t1[0],p2=t1[1],p3=t2[0],p4=t2[1];
         if(forbidden.has(gkey(p1,p2))||forbidden.has(gkey(p3,p4)))continue;
         if(!teamLegal(p1,p2)||!teamLegal(p3,p4))continue;
-        if(!matchupLegal(p1,p2,p3,p4))continue;
+        if(useRules && !matchupLegal(p1,p2,p3,p4))continue;
         let s=(partner[gkey(p1,p2)]||0)+(partner[gkey(p3,p4)]||0);s*=100;
         s+=((opp[gkey(p1,p3)]||0)+(opp[gkey(p1,p4)]||0)+(opp[gkey(p2,p3)]||0)+(opp[gkey(p2,p4)]||0))*10;
         s+=(games[p1]+games[p2]+games[p3]+games[p4]);
@@ -515,18 +525,18 @@ function evaluateSchedule(matches){
   for(const k in opp){const v=opp[k];if(v>maxOpp)maxOpp=v;sumSq+=v*v;}
   return {maxOpp,sumSq};
 }
-function buildScheduleOptimized(ps,num,pmode,forbidden){
+function buildScheduleOptimized(ps,num,pmode,forbidden,useRules){
   const n=ps.length;
   const runs=n>20?20:(n>12?50:100);
   let best=null,bestScore=Infinity;
   for(let r=0;r<runs;r++){
-    const matches=buildScheduleGreedy(ps,num,pmode,forbidden);
+    const matches=buildScheduleGreedy(ps,num,pmode,forbidden,useRules);
     if(matches.length<num)continue;
     const ev=evaluateSchedule(matches);
     const score=ev.maxOpp*1e9+ev.sumSq;
     if(score<bestScore){bestScore=score;best=matches;}
   }
-  return best||buildScheduleGreedy(ps,num,pmode,forbidden);
+  return best||buildScheduleGreedy(ps,num,pmode,forbidden,useRules);
 }
 
 function generateSchedule(numArg,pmodeArg){
@@ -537,7 +547,8 @@ function generateSchedule(numArg,pmodeArg){
   num=Math.max(1,Math.min(num,cap));
   const pmode=(pmodeArg!=null)?pmodeArg:document.getElementById('pmode').value;
   const forbidden=new Set(state.restrictions.map(r=>gkey(r[0],r[1])));
-  const matches=buildScheduleOptimized(ps,num,pmode,forbidden);
+  const useRules=state.settings.useRules!==false;
+  const matches=buildScheduleOptimized(ps,num,pmode,forbidden,useRules);
   if(!matches.length){toast('约束过紧，无法生成对阵');return;}
   state.matches=matches;state.settings.numMatches=num;state.settings.pmode=pmode;
   assignRounds();save();renderSchedule();updateStats();
@@ -716,9 +727,9 @@ function exportJSON(){const d=JSON.stringify({players:state.players,matches:stat
   const blob=new Blob([d],{type:'application/json'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='羽球双打轮转_'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出备份');}
 function importJSON(input){const f=input.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];state.settings=Object.assign({numMatches:null,pmode:'none'},d.settings||{});if(state.matches.length)assignRounds();save();renderAll();toast('导入成功');}catch(e){toast('文件格式错误');}};
+  r.onload=()=>{try{const d=JSON.parse(r.result);state.players=d.players||[];state.matches=d.matches||[];state.restrictions=d.restrictions||[];state.settings=Object.assign({numMatches:null,pmode:'none',useRules:true},d.settings||{});if(state.matches.length)assignRounds();save();renderAll();toast('导入成功');}catch(e){toast('文件格式错误');}};
   r.readAsText(f);input.value='';}
-function resetAll(){if(!confirm('确定清空全部选手、限制、对阵与比分？'))return;state.players=[];state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'none'};save();renderAll();toast('已清空全部');}
+function resetAll(){if(!confirm('确定清空全部选手、限制、对阵与比分？'))return;state.players=[];state.matches=[];state.restrictions=[];state.settings={numMatches:null,pmode:'none',useRules:true};save();renderAll();toast('已清空全部');}
 
 /* ---------- 导出到文件夹（File System Access API） ---------- */
 function downloadFile(name,content,mime){
@@ -831,7 +842,18 @@ async function exportToFolder(){
 }
 
 /* ---------- 初始化 ---------- */
-function renderAll(){renderPlayers();updateSuggestion();renderRestrictions();renderSchedule();updateStats();}
+function syncRulesUI(){
+  const el=document.getElementById('useRules');if(!el)return;
+  el.checked=state.settings.useRules!==false;
+  const t=document.getElementById('rulesState');if(t)t.textContent=el.checked?'开：限制对阵组合':'关：不限制组合';
+}
+function onRulesToggle(){
+  const el=document.getElementById('useRules');if(!el)return;
+  state.settings.useRules=!!el.checked;
+  const t=document.getElementById('rulesState');if(t)t.textContent=el.checked?'开：限制对阵组合':'关：不限制组合';
+  save();
+}
+function renderAll(){renderPlayers();updateSuggestion();renderRestrictions();renderSchedule();updateStats();syncRulesUI();}
 bootstrap();
 </script>
 </body>
