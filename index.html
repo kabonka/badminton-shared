@@ -404,7 +404,7 @@ function removePlayer(idx){
   for(const r of state.restrictions){let a=r[0],b=r[1];if(a===idx||b===idx)continue;if(a>idx)a--;if(b>idx)b--;newRest.push([a,b]);}
   state.restrictions=newRest;
   state.players.splice(idx,1);
-  save();renderPlayers();renderRestrictions();
+  save();renderPlayers();renderRestrictions();updateSuggestion();
   if(state.players.length>=4){generateSchedule();}
   else{state.matches=[];assignRounds();renderSchedule();updateStats();toast('已删除选手（人数不足 4，对阵已清空）');return;}
   toast(hadMatches?'已删除选手并重新生成对阵':'已删除选手');
@@ -558,7 +558,8 @@ function generateSchedule(numArg,pmodeArg){
   const useRules=state.settings.useRules!==false;
   const matches=buildScheduleOptimized(ps,num,pmode,forbidden,useRules);
   if(!matches.length){toast('约束过紧，无法生成对阵');return;}
-  state.matches=matches;state.settings.numMatches=num;state.settings.pmode=pmode;
+  state.matches=matches;state.settings.numMatches=matches.length;state.settings.pmode=pmode;
+  document.getElementById('numMatches').value=matches.length;
   assignRounds();save();renderSchedule();updateStats();
   toast(`已生成 ${matches.length} 场对阵`);
 }
