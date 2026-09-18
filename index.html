@@ -492,7 +492,9 @@ function buildScheduleGreedy(ps,num,pmode,forbidden,useRules){
         if(useRules && !matchupLegal(p1,p2,p3,p4))continue;
         let s=(partner[gkey(p1,p2)]||0)+(partner[gkey(p3,p4)]||0);s*=100;
         s+=((opp[gkey(p1,p3)]||0)+(opp[gkey(p1,p4)]||0)+(opp[gkey(p2,p3)]||0)+(opp[gkey(p2,p4)]||0))*10;
-        s+=(games[p1]+games[p2]+games[p3]+games[p4]);
+        const gsum=games[p1]+games[p2]+games[p3]+games[p4];
+        const gmax=Math.max(games[p1],games[p2],games[p3],games[p4]);
+        s+=gsum*20+gmax*12;
         if(pmode==='mixed'){
           if(ng(p1)&&ng(p2)&&ng(p1)===ng(p2))s+=8;
           if(ng(p3)&&ng(p4)&&ng(p3)===ng(p4))s+=8;
@@ -516,14 +518,20 @@ function buildScheduleGreedy(ps,num,pmode,forbidden,useRules){
   return matches;
 }
 function evaluateSchedule(matches){
+  let n=0;
+  for(const m of matches){for(const x of [...m.teamA,...m.teamB])if(x+1>n)n=x+1;}
+  const games=new Array(n).fill(0);
   const opp={};
   for(const m of matches){
     const [a,b]=m.teamA,[c,d]=m.teamB;
     for(const [x,y] of [[a,c],[a,d],[b,c],[b,d]])opp[gkey(x,y)]=(opp[gkey(x,y)]||0)+1;
+    games[a]++;games[b]++;games[c]++;games[d]++;
   }
   let maxOpp=0,sumSq=0;
   for(const k in opp){const v=opp[k];if(v>maxOpp)maxOpp=v;sumSq+=v*v;}
-  return {maxOpp,sumSq};
+  let gmin=Infinity,gmax=0;
+  for(let i=0;i<n;i++){if(games[i]<gmin)gmin=games[i];if(games[i]>gmax)gmax=games[i];}
+  return {maxOpp,sumSq,gameSpread:gmax-gmin};
 }
 function buildScheduleOptimized(ps,num,pmode,forbidden,useRules){
   const n=ps.length;
@@ -533,7 +541,7 @@ function buildScheduleOptimized(ps,num,pmode,forbidden,useRules){
     const matches=buildScheduleGreedy(ps,num,pmode,forbidden,useRules);
     if(matches.length<num)continue;
     const ev=evaluateSchedule(matches);
-    const score=ev.maxOpp*1e9+ev.sumSq;
+    const score=ev.maxOpp*1e9+ev.sumSq+ev.gameSpread*1e4;
     if(score<bestScore){bestScore=score;best=matches;}
   }
   return best||buildScheduleGreedy(ps,num,pmode,forbidden,useRules);
