@@ -207,7 +207,7 @@
         <div class="settings-row">
           <div style="flex:1">
             <label>比赛场数</label>
-            <input type="number" id="numMatches" min="1" placeholder="建议值">
+            <input type="number" id="numMatches" min="1" placeholder="建议值" oninput="_numAuto=(this.value==='')">
           </div>
           <div style="flex:1">
             <label>搭档偏好</label>
@@ -293,6 +293,7 @@ const DEFAULT_PLAYERS=[
   {name:'颖颖',gender:'F'},{name:'小可',gender:'F'},{name:'郭荣裕',gender:'M'},{name:'吴明谕',gender:'M'}
 ];
 const state={players:[],matches:[],restrictions:[],settings:{numMatches:null,pmode:'none',useRules:true},_curTab:'players'};
+let _numAuto=true;
 
 /* ---------- 工具 ---------- */
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -431,8 +432,8 @@ function updateSuggestion(){
   const sug=Math.floor(n*(n-1)/4);
   const el=document.getElementById('suggestion');
   const inp=document.getElementById('numMatches');
-  if(n>=4){el.innerHTML=`建议全场配对：<span class="sug">${sug}</span> 场（每人搭档所有人一次）`;if(!inp.value)inp.placeholder=sug;}
-  else{el.textContent='';inp.placeholder='建议值';}
+  if(n>=4){el.innerHTML=`建议全场配对：<span class="sug">${sug}</span> 场（每人搭档所有人一次）`;if(_numAuto){if(inp.value!==String(sug))inp.value=sug;}else{inp.placeholder=sug;}}
+  else{el.textContent='';inp.placeholder='建议值';if(_numAuto)inp.value='';}
 }
 
 /* ---------- 同队限制 ---------- */
@@ -550,7 +551,7 @@ function buildScheduleOptimized(ps,num,pmode,forbidden,useRules){
 function generateSchedule(numArg,pmodeArg){
   const ps=state.players,n=ps.length;
   if(n<4){toast('至少需要 4 名选手');return;}
-  let num=(numArg!=null)?numArg:(parseInt(document.getElementById('numMatches').value)||Math.floor(n*(n-1)/4)||1);
+  const _cap=Math.floor(n*(n-1)/4);let num=(numArg!=null)?numArg:(_numAuto?_cap:((parseInt(document.getElementById('numMatches').value))||_cap));num=Math.max(1,Math.min(num,_cap));
   const cap=Math.floor(n*(n-1)/2/2);
   num=Math.max(1,Math.min(num,cap));
   const pmode=(pmodeArg!=null)?pmodeArg:document.getElementById('pmode').value;
